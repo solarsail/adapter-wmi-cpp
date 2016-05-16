@@ -32,6 +32,5 @@ private:
 	int _adapter_index;
 	IWbemLocator* _locator;
 	IWbemServices* _service;
-	IWbemClassObject* m_pOutParams;
 };
 

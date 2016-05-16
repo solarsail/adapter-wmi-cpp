@@ -173,8 +173,8 @@ bool AdapterConfig::set_static_dns(LPCTSTR lpszDns1, LPCTSTR lpszDns2)
 	ULONG size = 0;
 	size += (lpszDns1 != NULL);
 	size += (lpszDns2 != NULL);
-	if (size == 0)
-		return false;
+	//if (size == 0)
+		//return false;
 
 	bool ret = true;
 
@@ -191,8 +191,10 @@ bool AdapterConfig::set_static_dns(LPCTSTR lpszDns1, LPCTSTR lpszDns2)
 	long DnsIndex2[] = { 1 };
 
 	SAFEARRAY *ip_list = SafeArrayCreateVector(VT_BSTR, 0, size);
-	SafeArrayPutElement(ip_list, DnsIndex1, dns1.GetBSTR());
-	if (size == 2) {
+	if (size > 0) {
+		SafeArrayPutElement(ip_list, DnsIndex1, dns1.GetBSTR());
+	}
+	if (size > 1) {
 		SafeArrayPutElement(ip_list, DnsIndex2, dns2.GetBSTR());
 	}
 	
@@ -348,46 +350,7 @@ err:
 
 bool AdapterConfig::set_auto_dns()
 {
-	if (!adapter_selected())
-		return false;
-
-	bool ret = true;
-
-	std::wstringstream ws;
-	ws << L"Win32_NetworkAdapterConfiguration.Index='" << _adapter_index << L"'";
-	_bstr_t instance_path(ws.str().c_str()); //index为网卡号
-	_bstr_t class_path(L"Win32_NetworkAdapterConfiguration");
-	_bstr_t set_dns_method(L"SetDNSServerSearchOrder");
-
-	IWbemClassObject *class_obj = nullptr;
-	IWbemClassObject *out_obj = nullptr;
-
-	VARIANT out_value;
-
-	// 获取 Win32_NetworkAdapterConfiguration 类对象
-	_last_hres = _service->GetObject(class_path, 0, NULL, &class_obj, NULL);
-	if (FAILED(_last_hres)) goto err;
-	// 在 Win32_NetworkAdapterConfiguration.Index='_adapter_index' 的实例上调用方法
-	_last_hres = _service->ExecMethod(instance_path, set_dns_method, 0, NULL,
-		NULL, &m_pOutParams, NULL);
-	if (FAILED(_last_hres)) goto err;
-
-	out_obj->Get(L"ReturnValue", 0, &out_value, 0, 0);
-	int code = out_value.intVal;
-	// TODO: check return code
-
-out:
-	if (out_obj)
-		out_obj->Release();
-	if (class_obj)
-		class_obj->Release();
-
-	return ret;
-
-err:
-	ret = false;
-	print_wmi_error(_last_hres);
-	goto out;
+	return set_static_dns(0, 0);
 }
 
 bool AdapterConfig::set_auto_ip()
