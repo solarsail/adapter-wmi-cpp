@@ -17,17 +17,20 @@ public:
 	bool set_static_ip(LPCTSTR lpszIP, LPCTSTR lpszNetmask, LPCTSTR lpszGateway);
 	bool set_auto_dns();
 	bool set_auto_ip();
-	HRESULT result();
-	void print_wmi_error(HRESULT hr);
-	void  CreateOneElementBstrArray(VARIANT *v, LPCWSTR s);
-	wchar_t* init_error_str() const;
+	char* init_error_str() const;
+
+	HRESULT call_result() const;
+	int wmi_result() const;
 
 private:
+	void print_wmi_error(HRESULT hr);
+	void CreateOneElementBstrArray(VARIANT *v, LPCWSTR s);
 	bool adapter_selected() const;
 
 private:
 	bool _init;
 	HRESULT _last_hres;
+	int _wmi_ret;
 	int _failed_step;
 	int _adapter_index;
 	IWbemLocator* _locator;

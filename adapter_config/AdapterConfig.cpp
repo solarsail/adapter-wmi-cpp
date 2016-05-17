@@ -9,8 +9,11 @@
 AdapterConfig::AdapterConfig() :
 	_init(false),
 	_last_hres(0),
+	_wmi_ret(0),
 	_failed_step(0),
-	_adapter_index(-1)
+	_adapter_index(-1),
+	_locator(nullptr),
+	_service(nullptr)
 {
 	_init = init();
 	if (!_init) {
@@ -26,6 +29,9 @@ AdapterConfig::~AdapterConfig()
 
 bool AdapterConfig::select_adapter(LPCTSTR name)
 {
+	if (!_init)
+		return false;
+
 	bool ret = false;
 
 	std::wstringstream ws;
@@ -52,12 +58,6 @@ bool AdapterConfig::select_adapter(LPCTSTR name)
 	return ret;
 }
 
-HRESULT AdapterConfig::result()
-{
-	
-	return _last_hres;
-}
-
 bool AdapterConfig::init()
 {
 	if (_init)
@@ -65,12 +65,13 @@ bool AdapterConfig::init()
 
 	// Step 1: --------------------------------------------------
 	// Initialize COM. ------------------------------------------
-	_last_hres = CoInitializeEx(0, COINIT_MULTITHREADED);
+	_last_hres = CoInitializeEx(0, COINIT_APARTMENTTHREADED);
 	if (FAILED(_last_hres)) {
 		_failed_step = 1;
 		return false;
 	}
 
+	/*
 	// Step 2: --------------------------------------------------
 	// Set general COM security levels --------------------------
 	_last_hres = CoInitializeSecurity(
@@ -90,6 +91,7 @@ bool AdapterConfig::init()
 		CoUninitialize();
 		return false;
 	}
+	*/
 
 	// Step 3: ---------------------------------------------------
 	// Obtain the initial locator to WMI -------------------------
@@ -226,7 +228,7 @@ bool AdapterConfig::set_static_dns(LPCTSTR lpszDns1, LPCTSTR lpszDns2)
 	if (FAILED(_last_hres)) goto err;
 	// 获取返回值
 	out_obj->Get(L"ReturnValue", 0, &out_value, 0, 0);
-	int code = out_value.intVal;
+	_wmi_ret = out_value.intVal;
 
 out:
 	if (out_obj)
@@ -277,8 +279,6 @@ bool AdapterConfig::set_static_ip(LPCTSTR lpszIP, LPCTSTR lpszNetmask, LPCTSTR l
 	IWbemClassObject *arg_inst = nullptr;
 	IWbemClassObject *out_obj = nullptr;
 
-	int code = 0;
-
 	// 获取 Win32_NetworkAdapterConfiguration 类对象
 	_last_hres = _service->GetObject(class_path, 0, NULL, &class_obj, NULL);
 	if (FAILED(_last_hres)) goto err;
@@ -297,7 +297,7 @@ bool AdapterConfig::set_static_ip(LPCTSTR lpszIP, LPCTSTR lpszNetmask, LPCTSTR l
 	if (FAILED(_last_hres)) goto err;
 
 	out_obj->Get(L"ReturnValue", 0, &out_value, 0, 0);
-	code = out_value.intVal;
+	_wmi_ret = out_value.intVal;
 	// TODO: check return code
 
 	// 清理中间对象
@@ -325,7 +325,7 @@ bool AdapterConfig::set_static_ip(LPCTSTR lpszIP, LPCTSTR lpszNetmask, LPCTSTR l
 	if (FAILED(_last_hres)) goto err;
 
 	out_obj->Get(L"ReturnValue", 0, &out_value, 0, 0);
-	code = out_value.intVal;
+	_wmi_ret = out_value.intVal;
 	// TODO: check return code
 
 out:
@@ -379,7 +379,7 @@ bool AdapterConfig::set_auto_ip()
 
 	VARIANT out_value;
 	out_obj->Get(L"ReturnValue", 0, &out_value, 0, 0);
-	int code = out_value.intVal;
+	_wmi_ret = out_value.intVal;
 
 out:
 	if (out_obj)
@@ -393,6 +393,11 @@ err:
 	ret = false;
 	print_wmi_error(_last_hres);
 	goto out;
+}
+
+HRESULT AdapterConfig::call_result() const
+{
+	return _last_hres;
 }
 
 void AdapterConfig::CreateOneElementBstrArray(VARIANT*  v, LPCWSTR  s)
@@ -411,15 +416,15 @@ void AdapterConfig::CreateOneElementBstrArray(VARIANT*  v, LPCWSTR  s)
 	v->parray = array;
 }
 
-wchar_t * AdapterConfig::init_error_str() const
+char * AdapterConfig::init_error_str() const
 {
-	static wchar_t* estr[] = {
-		L"No error",
-		L"Failed to initialize COM library",
-		L"Failed to initialize security",
-		L"Failed to create IWbemLocator object",
-		L"Could not connect",
-		L"Could not set proxy blanket"
+	static char* estr[] = {
+		"No error",
+		"Failed to initialize COM library",
+		"Failed to initialize security",
+		"Failed to create IWbemLocator object",
+		"Could not connect",
+		"Could not set proxy blanket"
 	};
 	return estr[_failed_step];
 }
@@ -427,6 +432,11 @@ wchar_t * AdapterConfig::init_error_str() const
 bool AdapterConfig::adapter_selected() const
 {
 	return _adapter_index >= 0;
+}
+
+int AdapterConfig::wmi_result() const
+{
+	return _wmi_ret;
 }
 
 void AdapterConfig::print_wmi_error(HRESULT hr) {
